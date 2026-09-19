@@ -23,7 +23,7 @@ variable "environment" {
 variable "location" {
   description = "Azure region in which to create resources."
   type        = string
-  default     = "eastus"
+  default     = "centralus"
 }
 
 variable "resource_group_name" {
