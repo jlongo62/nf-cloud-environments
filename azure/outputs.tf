@@ -48,3 +48,13 @@ output "entra_client_secret" {
   value       = module.nextflow_batch.entra_client_secret
   sensitive   = true
 }
+
+output "head_pool_name" {
+  description = "Batch pool for the Nextflow head job."
+  value       = module.nextflow_batch.head_pool_name
+}
+
+output "worker_pool_name" {
+  description = "Batch pool for Nextflow process tasks."
+  value       = module.nextflow_batch.worker_pool_name
+}

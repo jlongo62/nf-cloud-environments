@@ -49,4 +49,3 @@ variable "storage_container_name" {
     error_message = "storage_container_name must contain 3-63 lowercase letters, numbers, or hyphens and start/end with a letter or number."
   }
 }
-
