@@ -1,0 +1,5 @@
+region          = "us-central1"
+# bucket_location = "US"
+# bucket_name     = "terraform-state-2c8f311b"
+# retention_period_seconds = 604800
+# noncurrent_version_retention_days = 30
