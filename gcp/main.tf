@@ -1,4 +1,6 @@
 locals {
+  deployment_name  = "${var.project_name}-${var.environment}"
+  work_bucket_name = var.bucket_name == null ? null : "${var.bucket_name}-${var.environment}"
   common_labels = merge(var.labels, {
     environment = var.environment
     managed_by  = "terraform"
@@ -9,10 +11,10 @@ locals {
 module "nextflow_batch" {
   source = "../modules/nf-gcp-batch"
 
-  name_prefix          = "${var.project_name}-${var.environment}"
+  name_prefix          = local.deployment_name
   project_id           = var.project_id
   region               = var.region
-  bucket_name          = var.bucket_name
+  bucket_name          = local.work_bucket_name
   work_prefix          = var.work_prefix
   force_destroy_bucket = var.force_destroy_bucket
   head_machine_type    = var.head_machine_type

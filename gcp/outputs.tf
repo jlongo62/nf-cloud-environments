@@ -52,3 +52,16 @@ output "use_spot" {
   description = "Recommended default for running Google Batch tasks on Spot VMs."
   value       = module.nextflow_batch.use_spot
 }
+
+output "nextflow_config_parameters" {
+  description = "Parameters to copy into a Nextflow Google Batch configuration."
+  value = {
+    workDir             = module.nextflow_batch.work_uri
+    project             = module.nextflow_batch.project_id
+    location            = module.nextflow_batch.region
+    serviceAccountEmail = module.nextflow_batch.nextflow_job_service_account_email
+    headMachineType     = module.nextflow_batch.head_machine_type
+    workerMachineType   = module.nextflow_batch.worker_machine_type
+    spot                = module.nextflow_batch.use_spot
+  }
+}

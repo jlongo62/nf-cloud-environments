@@ -13,6 +13,24 @@ Google Cloud Batch is job-based and does not use persistent pools. Instead, this
 - IAM bindings for Batch job submission, service-account usage, job status reporting, logging, and bucket access
 - Optional enablement of required APIs: Batch, Compute, IAM, Logging, and Storage
 
+## Principals and permissions
+
+The deployment creates these environment-specific service accounts and
+bindings:
+
+- The launch-run account has `roles/batch.jobsEditor` on the project and
+  `roles/iam.serviceAccountUser` on the Nextflow job account. It also has
+  access to the work bucket for staging and collecting workflow data.
+- The Nextflow job account has `roles/batch.agentReporter` and
+  `roles/logging.logWriter` on the project, plus work-bucket access for Batch
+  task VMs.
+- The nf-command-center datalink account has work-bucket access for data-link
+  operations.
+
+Enabling `batch.googleapis.com` creates the Google-managed Batch service
+agent and grants it `roles/batch.serviceAgent` automatically. That managed
+binding is intentionally not duplicated in Terraform.
+
 ## Prerequisites
 
 - Terraform 1.7 or newer
@@ -61,17 +79,87 @@ gcloud config set project <project-id>
 
 ## Deploy
 
+Authenticate without placing credentials in Terraform files:
+
+```sh
+gcloud auth login
+gcloud auth application-default login
+gcloud projects list
+gcloud config set project YOUR_PROJECT_ID
+gcloud config get-value project
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+export GOOGLE_PROJECT="$(gcloud config get-value project)"
+echo $GOOGLE_PROJECT
+```
+
 ```sh
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars for your region and optional project override.
+bash scripts/init-gcp-backend.sh
 terraform init
 terraform fmt -check
 terraform validate
 terraform plan -out=nf-gcp.tfplan
 terraform apply nf-gcp.tfplan
+
+terraform apply -var-file=terraform.tfvars
+terraform destroy -var-file=terraform.tfvars
 ```
 
+This deployment stores Terraform state in the GCS bucket created by
+`state-environment/gcp`, under `terraform/state/gcp/<environment>`. The init
+wrapper reads `environment` from `terraform.tfvars` and passes the matching
+backend prefix to Terraform. For an existing local state, run
+`bash scripts/init-gcp-backend.sh -migrate-state` and review the migration
+prompt before continuing. If `bucket_name` is set, the environment is
+appended to keep work buckets distinct.
+
 Review every plan before applying it. To remove resources later, run `terraform destroy` after reviewing the destroy plan. The default `force_destroy_bucket = false` prevents Terraform from deleting a non-empty work bucket.
+
+## Resource inventory
+
+For only the resource type and name:
+
+```sh
+terraform show -json |
+jq -r '
+  def resource_name:
+    (.values.account_id // .values.name // .values.service // .values.id // .name);
+  def rows($module):
+    ($module.resources[]? | select(.mode != "data") | [.type, resource_name]),
+    ($module.child_modules[]? | rows(.));
+  ["TYPE", "NAME"],
+  (rows(.values.root_module))
+  | @tsv
+' |
+column -t -s $'\t'
+```
+
+After applying, list every resource in the state, including resources inside
+the reusable module:
+
+```sh
+terraform show -json |
+jq -r '
+  def rows($module):
+    ($module.resources[]? | select(.mode != "data") | [.type, resource_name, .address]),
+    ($module.child_modules[]? | rows(.));
+  ["TYPE", "NAME", "ADDRESS"],
+  (rows(.values.root_module))
+  | @tsv
+' |
+column -t -s $'\t'
+```
+
+The output includes the Terraform resource type, resource name, and full
+provider resource name when available, and the full resource address. Data
+resources are excluded. Save it as a file when needed:
+
+```sh
+terraform show -json |
+jq -r 'def resource_name: (.values.account_id // .values.name // .values.service // .values.id // .name); def rows($module): ($module.resources[]? | select(.mode != "data") | [.type, resource_name, .address]), ($module.child_modules[]? | rows(.)); ["TYPE", "NAME", "ADDRESS"], (rows(.values.root_module)) | @tsv' |
+column -t -s $'\t' > gcp-resource-inventory.txt
+```
 
 ## Configure Nextflow
 
@@ -82,6 +170,9 @@ terraform output -raw work_uri
 terraform output -raw project_id
 terraform output -raw region
 terraform output -raw nextflow_job_service_account_email
+
+# All Nextflow Google Batch parameters as one JSON object.
+terraform output -json nextflow_config_parameters
 ```
 
 Then copy and edit `nextflow.gcp.config.example` to configure `google-batch` with the returned values. Set `workDir` to the emitted `work_uri`, and assign `label 'head'` or `label 'worker'` in your pipeline processes when you want explicit head/worker machine-type selection.
@@ -94,6 +185,7 @@ Then copy and edit `nextflow.gcp.config.example` to configure `google-batch` wit
 - `variables.tf`: deployment inputs
 - `outputs.tf`: useful module outputs
 - `terraform.tfvars.example`: safe configuration template
+- `scripts/init-gcp-backend.sh`: initializes the environment-specific GCS backend
 - `nextflow.gcp.config.example`: starter Nextflow `google-batch` config
 - `../modules/nf-gcp-batch`: reusable Batch IAM and GCS module
 

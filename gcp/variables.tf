@@ -10,13 +10,13 @@ variable "project_name" {
 }
 
 variable "environment" {
-  description = "Deployment environment name."
+  description = "Deployment environment name used in resource and state names."
   type        = string
   default     = "dev"
 
   validation {
-    condition     = contains(["dev", "test", "staging", "prod"], var.environment)
-    error_message = "environment must be one of: dev, test, staging, prod."
+    condition     = can(regex("^[a-z][a-z0-9-]{0,14}[a-z0-9]$", var.environment))
+    error_message = "environment must be 2-16 lowercase letters, numbers, or hyphens, start with a letter, and end with a letter or number."
   }
 }
 
@@ -39,14 +39,14 @@ variable "region" {
 }
 
 variable "bucket_name" {
-  description = "Optional globally unique GCS bucket name."
+  description = "Optional globally unique base name for the environment-specific GCS work bucket."
   type        = string
   default     = null
   nullable    = true
 
   validation {
-    condition     = var.bucket_name == null || can(regex("^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$", var.bucket_name))
-    error_message = "bucket_name must be 3-63 characters and use lowercase letters, numbers, periods, underscores, or hyphens."
+    condition     = var.bucket_name == null || (length(var.bucket_name) <= 46 && can(regex("^[a-z0-9][a-z0-9._-]{1,44}[a-z0-9]$", var.bucket_name)))
+    error_message = "bucket_name must be 3-46 characters and use lowercase letters, numbers, periods, underscores, or hyphens; the environment suffix is appended."
   }
 }
 
