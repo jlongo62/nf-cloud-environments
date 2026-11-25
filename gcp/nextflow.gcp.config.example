@@ -1,0 +1,28 @@
+plugins {
+    id 'nf-google'
+}
+
+process {
+    executor = 'google-batch'
+    container = 'ubuntu:24.04'
+
+    withLabel: head {
+        machineType = '<terraform output -raw head_machine_type>'
+    }
+
+    withLabel: worker {
+        machineType = '<terraform output -raw worker_machine_type>'
+    }
+}
+
+workDir = '<terraform output -raw work_uri>'
+
+google {
+    project = '<terraform output -raw project_id>'
+    location = '<terraform output -raw region>'
+
+    batch {
+        serviceAccountEmail = '<terraform output -raw nextflow_job_service_account_email>'
+        spot = true
+    }
+}
